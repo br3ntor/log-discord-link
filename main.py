@@ -13,9 +13,13 @@ import subprocess
 from collections.abc import Callable
 
 
+# TODO: Package it into my own module and upload to github perhaps
 class LogMonitor:
     def __init__(
-        self, log_directory: str, log_file_pattern: str, line_callback: Callable
+        self,
+        log_directory: str,
+        log_file_pattern: str,
+        line_callback: Callable[[str], None],
     ):
         self.log_directory = log_directory
         self.log_file_pattern = log_file_pattern
@@ -24,7 +28,7 @@ class LogMonitor:
         self.current_task = None
         self.process = None
 
-    async def tail_log(self, file_path, line_callback):
+    async def tail_log(self, file_path: str, line_callback: Callable[[str], None]):
         """Uses tail to get newly logged line an run the callback on it."""
         try:
             self.process = await asyncio.create_subprocess_exec(
@@ -39,6 +43,7 @@ class LogMonitor:
                 print("Failed to access log")
                 return
 
+            print("Tailing new log file")
             async for line in self.process.stdout:
                 decoded_line = line.decode("utf-8").strip()
                 line_callback(decoded_line)
@@ -47,13 +52,13 @@ class LogMonitor:
             print(f"Error: {e}")
         finally:
             if self.process:
-                print("Terminating process")
                 self.process.terminate()
+                print("Terminated old process")
 
     async def watch_log(
         self,
     ):
-        """Responsible for watching the correct file name expecting it
+        """Responsible for watching the correct file name, expecting it
         will change when the program creating the log restarts."""
         while True:
             log_files = glob.glob(
@@ -71,7 +76,7 @@ class LogMonitor:
                         try:
                             await self.current_task
                         except asyncio.CancelledError:
-                            print(f"Task cancelled for:\n{self.current_log_file}")
+                            print(f"Task cancelled for: {self.current_log_file}")
                         else:
                             print("what the...")
                             return
