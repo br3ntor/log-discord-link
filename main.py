@@ -1,10 +1,4 @@
-"""
-This program will watch the contents of a log file and its
-name on the file system. If the file name changes it will
-start watching the new log file. The file name is watched
-through polling and we don't care if the first few lines
-are not caught.
-"""
+#!/usr/bin/env python3
 
 import asyncio
 import glob
@@ -15,6 +9,14 @@ from collections.abc import Callable
 
 # TODO: Package it into my own module and upload to github perhaps
 class LogMonitor:
+    """
+    Watches the contents of a log file and its
+    name on the file system. If the file name changes it will
+    start watching the new log file. The file name is watched
+    through polling and we don't care if the first few lines
+    are not caught.
+    """
+
     def __init__(
         self,
         log_directory: str,
@@ -43,7 +45,7 @@ class LogMonitor:
                 print("Failed to access log")
                 return
 
-            print("Tailing new log file")
+            print("Tailing new log file:")
             async for line in self.process.stdout:
                 decoded_line = line.decode("utf-8").strip()
                 line_callback(decoded_line)
@@ -53,7 +55,7 @@ class LogMonitor:
         finally:
             if self.process:
                 self.process.terminate()
-                print("Terminated old process")
+                print("Terminated old process.")
 
     async def watch_log(
         self,
@@ -86,7 +88,7 @@ class LogMonitor:
                         self.tail_log(self.current_log_file, self.line_callback)
                     )
             else:
-                print("No chat log, hopefully server is restarting")
+                print("No log file, server restarting? Waiting for fresh log file...")
 
             await asyncio.sleep(5)
 
