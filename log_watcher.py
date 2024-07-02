@@ -8,7 +8,7 @@ import asyncio
 import glob
 import os
 import subprocess
-from collections.abc import Callable
+from typing import Callable, Coroutine
 
 
 class LogMonitor:
@@ -21,7 +21,8 @@ class LogMonitor:
 
     Attributes:
         log_directory: Directory containing log file.
-        log_file_pattern: A pattern to match log file with unique name.
+        log_file_pattern: A pattern to match a log file with
+                            unique name or just the filename.
         line_callback: Function to handle new log lines.
     """
 
@@ -29,7 +30,7 @@ class LogMonitor:
         self,
         log_directory: str,
         log_file_pattern: str,
-        line_callback: Callable[[str], None],
+        line_callback: Callable[[str], Coroutine],
     ):
         self.log_directory = log_directory
         self.log_file_pattern = log_file_pattern
@@ -44,7 +45,7 @@ class LogMonitor:
         try:
             self.process = await asyncio.create_subprocess_exec(
                 "tail",
-                "-F",
+                "-Fn 1",
                 file_path,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -54,17 +55,23 @@ class LogMonitor:
                 print("Failed to access log")
                 return
 
-            print("Tailing new log file:")
+            print(f"Tailing log file: {file_path}")
             async for line in self.process.stdout:
                 decoded_line = line.decode("utf-8").strip()
-                self.line_callback(decoded_line)
+                await self.line_callback(decoded_line)
 
-        except Exception as e:
-            print(f"Error: {e}")
+        except asyncio.CancelledError:
+            print(f"TL:Task cancelled for: {file_path}")
         finally:
             if self.process:
-                self.process.terminate()
-                print("Terminated old process.")
+                try:
+                    print(self.process)
+                    self.process.terminate()
+                    await self.process.wait()
+                    print("Terminated old process.")
+                except ProcessLookupError as ple:
+                    print("ProcessLookupError: Process already stopped.")
+                    print(ple)
 
     async def watch_log(
         self,
@@ -88,10 +95,7 @@ class LogMonitor:
                         try:
                             await self.current_task
                         except asyncio.CancelledError:
-                            print(f"Task cancelled for: {self.current_log_file}")
-                        else:
-                            print("what the...")
-                            return
+                            print(f"WL:Task cancelled for: {self.current_log_file}")
 
                     self.current_log_file = latest_log_file
                     self.current_task = asyncio.create_task(
@@ -105,14 +109,17 @@ class LogMonitor:
     async def start(self):
         """Start watching the log."""
         log_files = glob.glob(os.path.join(self.log_directory, self.log_file_pattern))
-        if log_files:
-            # If there are ever more than one log file this will select new
-            latest_log_file = max(log_files, key=os.path.getctime)
 
+        if log_files:
+            latest_log_file = max(log_files, key=os.path.getctime)
+        else:
+            print("No log file.")
+            return
+
+        # I really only want to look for * in my case
         glob_chars = ["*", "?", "[", "]"]
         has_glob_chars = any([True for g in glob_chars if g in self.log_file_pattern])
-        (
+        if has_glob_chars:
             await self.watch_log()
-            if has_glob_chars
-            else await self.tail_log(latest_log_file)
-        )
+        else:
+            asyncio.create_task(self.tail_log(latest_log_file))
