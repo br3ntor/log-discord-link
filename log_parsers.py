@@ -35,6 +35,9 @@ def parse_valheim_chat(log_line: str) -> str | None:
     pattern = r"(<color=.*?>)(.*?)(</color>)"
     matches = re.findall(pattern, log_line)
 
+    if not matches:
+        return None
+
     print(matches)
 
     # Extract only the text from each match and create a list

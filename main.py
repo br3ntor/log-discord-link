@@ -24,20 +24,31 @@ async def monitor_logs():
 
     # RealTimeLogProcessor callback functions to prep and send game chat to discord
 
-    async def process_pel_chat(line: str):
+    async def process_test_chat(line: str):
         parsed_line = parse_zomboid_chat(line)
         if parsed_line:
             await send_to_discord(parsed_line, 1257565711816069161)
 
+    async def process_pel_chat(line: str):
+        parsed_line = parse_zomboid_chat(line)
+        if parsed_line:
+            await send_to_discord(parsed_line, 1178611552849494016)
+
     async def process_heavy_chat(line: str):
         parsed_line = parse_zomboid_chat(line)
         if parsed_line:
-            await send_to_discord(parsed_line, 1257565711816069161)
+            await send_to_discord(parsed_line, 950156506735730719)
 
     async def process_valheim_chat(line: str):
         parsed_line = parse_valheim_chat(line)
         if parsed_line:
             await send_to_discord(parsed_line, 1249231130901610628)
+
+    # Project Zomboid test_pzserver
+    testpz_log_directory = "/home/test_pzserver/Zomboid/Logs/"
+    testpz_log_monitor = RealTimeLogProcessor(
+        testpz_log_directory, "*chat.txt", process_test_chat
+    )
 
     # Project Zomboid pel_pzserver
     pelpz_log_directory = "/home/pel_pzserver/Zomboid/Logs/"
@@ -58,6 +69,7 @@ async def monitor_logs():
     )
 
     await asyncio.gather(
+        testpz_log_monitor.start(),
         pelpz_log_monitor.start(),
         heavypz_log_monitor.start(),
         valheim_log_monitor.start(),
