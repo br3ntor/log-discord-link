@@ -4,17 +4,27 @@ import re
 
 
 def parse_zomboid_chat(log_line: str) -> str | None:
-    if "Got Message:" not in log_line:
+    if "Got message:" not in log_line:
         return None
-    # Split the text by curly braces
-    parts = log_line.split("{", 1)[1].split("}")[0].split(",")
 
-    # Extract key-value pairs and remove quotes
-    extracted_data = {
-        part.split("=")[0].strip(): part.split("=")[1].strip("'") for part in parts
-    }
-    formatted_text = extracted_data["author"] + ": " + extracted_data["text"]
-    print(extracted_data)
+    # Simplified regex pattern to match the components
+    pattern = r"ChatMessage\{chat=(.*?), author='(.*?)', text='(.*?)'\}"
+
+    match = re.search(pattern, log_line)
+
+    if match is None:
+        return None
+
+    chat = match.group(1)
+    author = match.group(2)
+    text = match.group(3)
+
+    if chat != "General":
+        return None
+
+    formatted_text = f"{author}: {text}"
+
+    print(formatted_text)
     return formatted_text
 
 

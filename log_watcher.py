@@ -77,9 +77,8 @@ class RealTimeLogProcessor:
                     self.process.terminate()
                     await self.process.wait()
                     print("Terminated old process.")
-                except ProcessLookupError as e:
-                    print(f"ProcessLookupError occurred: {type(e)}")
-                    print(f"File not found: {e.filename}")
+                except ProcessLookupError:
+                    print("ProcessLookupError occurred, process already stopped?")
 
     async def watch_log(
         self,
@@ -130,5 +129,4 @@ class RealTimeLogProcessor:
         if has_glob_chars:
             await self.watch_log()
         else:
-            await self.tail_log(latest_log_file)
-            # asyncio.create_task(self.tail_log(latest_log_file))
+            asyncio.create_task(self.tail_log(latest_log_file))
