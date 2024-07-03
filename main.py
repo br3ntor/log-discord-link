@@ -7,7 +7,8 @@ import os
 import discord
 from dotenv import load_dotenv
 
-from log_watcher import LogMonitor
+from log_parsers import parse_valheim_chat, parse_zomboid_chat
+from log_watcher import RealTimeLogProcessor
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
@@ -20,26 +21,48 @@ async def send_to_discord(message: str, channel_id: int):
 
 
 async def monitor_logs():
-    async def process_line(line: str):
-        print(line)
-        await send_to_discord(line, 1257565711816069161)
+
+    # RealTimeLogProcessor callback functions to prep and send game chat to discord
+    async def process_test_chat(line: str):
+        parsed_line = parse_zomboid_chat(line)
+        if parsed_line:
+            await send_to_discord(parsed_line, 1257565711816069161)
+
+    async def process_pel_chat(line: str):
+        parsed_line = parse_zomboid_chat(line)
+        if parsed_line:
+            await send_to_discord(parsed_line, 1257565711816069161)
+
+    async def process_valheim_chat(line: str):
+        parsed_line = parse_valheim_chat(line)
+        if parsed_line:
+            await send_to_discord(parsed_line, 1249231130901610628)
+
+    # Setup log files for processing
 
     # Project Zomboid test_pzserver
     testpz_log_directory = "/home/test_pzserver/Zomboid/Logs/"
-    testpz_log_monitor = LogMonitor(testpz_log_directory, "*chat.txt", process_line)
-
-    # Project Zomboid heavy_pzserver
-    # heavypz_log_directory = "/home/heavy_pzserver/Zomboid/Logs/"
-    # heavypz_log_monitor = LogMonitor(heavypz_log_directory, "*chat.txt", process_line)
-    # Project Zomboid heavy_pzserver
-    heavypz_log_directory = "/home/heavy_pzserver/log/console/"
-    heavypz_log_monitor = LogMonitor(
-        heavypz_log_directory, "pzserver-console.log", process_line
+    testpz_log_monitor = RealTimeLogProcessor(
+        testpz_log_directory, "*chat.txt", process_test_chat
     )
 
-    await asyncio.gather(testpz_log_monitor.start(), heavypz_log_monitor.start())
-    # await testpz_log_monitor.start()
-    # await heavypz_log_monitor.start()
+    # Project Zomboid heavy_pzserver
+    heavypz_log_directory = "/home/heavy_pzserver/Zomboid/Logs/"
+    heavypz_log_monitor = RealTimeLogProcessor(
+        heavypz_log_directory, "*chat.txt", process_pel_chat
+    )
+
+    # Valheim server
+    valheim_log_directory = "/home/vhserver/log/console/"
+    valheim_log_monitor = RealTimeLogProcessor(
+        valheim_log_directory, "vhserver-console.log", process_valheim_chat
+    )
+
+    await asyncio.gather(
+        testpz_log_monitor.start(),
+        heavypz_log_monitor.start(),
+        valheim_log_monitor.start(),
+    )
 
 
 @client.event
@@ -62,6 +85,5 @@ if __name__ == "__main__":
         if isinstance(token, str):
             client.run(token)
 
-        # asyncio.run(monitor_logs())
     except KeyboardInterrupt:
         print("Shutting down")

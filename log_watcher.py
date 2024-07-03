@@ -1,7 +1,5 @@
 """
-For watching log files that get new names
-on log rotation. For example, the log name
-contains the file creation date and time.
+Runs a user-defined callback on new log lines.
 """
 
 import asyncio
@@ -11,19 +9,29 @@ import subprocess
 from typing import Callable, Coroutine
 
 
-class LogMonitor:
+class RealTimeLogProcessor:
     """
-    Watches the contents of a log file and its
-    name on the file system. If the file name changes it will
-    start watching the new log file. The file name is watched
-    through polling and we don't care if the first few lines
-    are not caught.
+    This class monitors a log file for new lines and triggers a
+    user-defined callback function for each new line. It can handle
+    situations where the log file name changes or remains the same after
+    a program restart.
+
+    Args:
+        log_directory (str): The directory containing the log file.
+        log_file_pattern (str): A pattern to match the log file. This can
+            be:
+                * A filename (e.g., "error.log")
+                * A wildcard pattern (e.g., "*.log") to match any file with
+                  a specific extension
+        line_callback (callable): The function to be called for each new
+            line in the log. This function should take a single argument
+            (the new line content as a string).
 
     Attributes:
-        log_directory: Directory containing log file.
-        log_file_pattern: A pattern to match a log file with
-                            unique name or just the filename.
-        line_callback: Function to handle new log lines.
+        log_directory (str): The directory containing the log file
+            (read-only).
+        log_file_pattern (str): The pattern used to match the log file
+            (read-only).
     """
 
     def __init__(
@@ -69,9 +77,9 @@ class LogMonitor:
                     self.process.terminate()
                     await self.process.wait()
                     print("Terminated old process.")
-                except ProcessLookupError as ple:
-                    print("ProcessLookupError: Process already stopped.")
-                    print(ple)
+                except ProcessLookupError as e:
+                    print(f"ProcessLookupError occurred: {type(e)}")
+                    print(f"File not found: {e.filename}")
 
     async def watch_log(
         self,
@@ -122,4 +130,5 @@ class LogMonitor:
         if has_glob_chars:
             await self.watch_log()
         else:
-            asyncio.create_task(self.tail_log(latest_log_file))
+            await self.tail_log(latest_log_file)
+            # asyncio.create_task(self.tail_log(latest_log_file))
