@@ -93,61 +93,72 @@ async def send_to_discord(message: str, channel_id: int):
     )
 
 
-# TODO: Make less DRY
+def create_chat_processor(parser_func, discord_channel_id):
+    """
+    Factory function that creates a log processing callback.
+    """
+
+    async def process_chat(line: str):
+        parsed_line = parser_func(line)
+        if parsed_line:
+            await send_to_discord(parsed_line, discord_channel_id)
+
+    return process_chat
+
+
 async def monitor_logs():
+    # Configuration for each server you want to monitor
+    server_configs = [
+        {
+            "name": "pzserver",
+            "log_directory": "/home/pzserver/Zomboid/Logs/",
+            "log_pattern": "*chat.txt",
+            "parser": parse_zomboid_chat,
+            "channel_id": 1381876552769208330,
+            "enabled": True,
+        },
+        {
+            "name": "test_pzserver",
+            "log_directory": "/home/test_pzserver/Zomboid/Logs/",
+            "log_pattern": "*chat.txt",
+            "parser": parse_zomboid_chat,
+            "channel_id": 1257565711816069161,
+            "enabled": False,  # Easily toggle servers on and off
+        },
+        {
+            "name": "heavy_pzserver",
+            "log_directory": "/home/heavy_pzserver/Zomboid/Logs/",
+            "log_pattern": "*chat.txt",
+            "parser": parse_zomboid_chat,
+            "channel_id": 950156506735730719,
+            "enabled": False,
+        },
+        {
+            "name": "valheim_server",
+            "log_directory": "/home/vhserver/log/console/",
+            "log_pattern": "vhserver-console.log",
+            "parser": parse_valheim_chat,
+            "channel_id": 1249231130901610628,
+            "enabled": False,
+        },
+    ]
 
-    # RealTimeLogProcessor callback functions to prep and send game chat to discord
+    tasks = []
+    for config in server_configs:
+        if config["enabled"]:
+            # Create the specific processor for this server
+            chat_processor = create_chat_processor(
+                config["parser"], config["channel_id"]
+            )
 
-    async def process_test_chat(line: str):
-        parsed_line = parse_zomboid_chat(line)
-        if parsed_line:
-            await send_to_discord(parsed_line, 1257565711816069161)
+            # Create the log monitor instance
+            log_monitor = RealTimeLogProcessor(
+                config["log_directory"], config["log_pattern"], chat_processor
+            )
+            tasks.append(log_monitor.start())
 
-    async def process_pzserver_chat(line: str):
-        parsed_line = parse_zomboid_chat(line)
-        if parsed_line:
-            await send_to_discord(parsed_line, 1381876552769208330)
-
-    async def process_heavy_chat(line: str):
-        parsed_line = parse_zomboid_chat(line)
-        if parsed_line:
-            await send_to_discord(parsed_line, 950156506735730719)
-
-    async def process_valheim_chat(line: str):
-        parsed_line = parse_valheim_chat(line)
-        if parsed_line:
-            await send_to_discord(parsed_line, 1249231130901610628)
-
-    # Project Zomboid test_pzserver
-    # testpz_log_directory = "/home/test_pzserver/Zomboid/Logs/"
-    # testpz_log_monitor = RealTimeLogProcessor(
-    #     testpz_log_directory, "*chat.txt", process_test_chat
-    # )
-
-    # Project Zomboid Modded
-    pzserver_log_directory = "/home/pzserver/Zomboid/Logs/"
-    pzserver_log_monitor = RealTimeLogProcessor(
-        pzserver_log_directory, "*chat.txt", process_pzserver_chat
-    )
-
-    # Project Zomboid heavy_pzserver
-    # heavypz_log_directory = "/home/heavy_pzserver/Zomboid/Logs/"
-    # heavypz_log_monitor = RealTimeLogProcessor(
-    #     heavypz_log_directory, "*chat.txt", process_heavy_chat
-    # )
-
-    # Valheim server
-    # valheim_log_directory = "/home/vhserver/log/console/"
-    # valheim_log_monitor = RealTimeLogProcessor(
-    #     valheim_log_directory, "vhserver-console.log", process_valheim_chat
-    # )
-
-    await asyncio.gather(
-        # testpz_log_monitor.start(),
-        pzserver_log_monitor.start(),
-        # heavypz_log_monitor.start(),
-        # valheim_log_monitor.start(),
-    )
+    if tasks:
+        await asyncio.gather(*tasks)
 
 
 @client.event
